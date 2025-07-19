@@ -160,6 +160,37 @@ export async function createDemo(config) {
  */
 async function saveTranscript(filePath, segments) {
   const fs = await import('fs/promises');
-  const transcript = segments.join('\n\n');
-  await fs.writeFile(filePath, transcript, 'utf8');
+  
+  // Create both plain text and SRT format
+  const plainText = segments.join('\n\n');
+  
+  // Generate SRT format with timestamps
+  const srtContent = segments.map((segment, index) => {
+    const startTime = formatSRTTime(index * 3000); // Assume 3 seconds per segment
+    const endTime = formatSRTTime((index + 1) * 3000);
+    
+    return `${index + 1}\n${startTime} --> ${endTime}\n${segment}\n`;
+  }).join('\n');
+  
+  // Save plain text transcript
+  await fs.writeFile(filePath, plainText, 'utf8');
+  
+  // Save SRT subtitle file
+  const srtPath = filePath.replace('.txt', '.srt');
+  await fs.writeFile(srtPath, srtContent, 'utf8');
+}
+
+/**
+ * Format time for SRT subtitle format
+ * @param {number} milliseconds - Time in milliseconds
+ * @returns {string} Formatted time string
+ */
+function formatSRTTime(milliseconds) {
+  const totalSeconds = Math.floor(milliseconds / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const ms = milliseconds % 1000;
+  
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
 }

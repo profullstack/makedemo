@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "node src/index.js",
+    "setup": "node scripts/setup.js",
     "test": "mocha test/**/*.test.js --recursive",
     "test:watch": "mocha test/**/*.test.js --recursive --watch",
     "test:coverage": "c8 mocha test/**/*.test.js --recursive",
@@ -16,7 +17,9 @@
     "lint:fix": "eslint src/ test/ --fix",
     "format": "prettier --write src/ test/",
     "format:check": "prettier --check src/ test/",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "build": "echo 'No build step required for Node.js project'",
+    "postinstall": "node scripts/setup.js"
   },
   "keywords": [
     "cli",
