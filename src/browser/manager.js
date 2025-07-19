@@ -115,12 +115,15 @@ export class BrowserManager {
     });
 
     try {
-      // Find the element
-      const element = await this.page.$(selector);
+      // Try to find the element with multiple strategies
+      let element = await this.findElementWithFallback(selector, description);
       
       if (!element) {
         throw new Error(`Element not found: ${selector}`);
       }
+
+      // Scroll element into view if needed
+      await element.scrollIntoViewIfNeeded();
 
       // Execute the interaction based on type
       switch (type) {
@@ -132,6 +135,8 @@ export class BrowserManager {
           if (!text) {
             throw new Error('Text is required for type interaction');
           }
+          // Clear existing text first using Puppeteer's correct method
+          await element.click({ clickCount: 3 }); // Select all text
           await element.type(text);
           break;
           
@@ -141,6 +146,15 @@ export class BrowserManager {
           
         case 'focus':
           await element.focus();
+          break;
+          
+        case 'scroll':
+          // Scroll the element into view
+          await element.scrollIntoView();
+          // Additional scroll to ensure visibility
+          await this.page.evaluate((el) => {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, element);
           break;
           
         default:
@@ -162,6 +176,179 @@ export class BrowserManager {
       });
       throw error;
     }
+  }
+
+  /**
+   * Find element with multiple fallback strategies
+   * @param {string} selector - Primary CSS selector
+   * @param {string} description - Description of the element for intelligent fallback
+   * @returns {Promise<Object|null>} Element handle or null
+   */
+  async findElementWithFallback(selector, description = '') {
+    if (!this.page) {
+      return null;
+    }
+
+    this.logger?.debug('Finding element with fallback', { selector, description });
+
+    // Strategy 1: Try the exact selector
+    let element = await this.page.$(selector);
+    if (element) {
+      this.logger?.debug('Element found with exact selector', { selector });
+      return element;
+    }
+
+    // Strategy 2: Try to find by text content if description contains keywords
+    if (description) {
+      const textKeywords = this.extractTextKeywords(description);
+      for (const keyword of textKeywords) {
+        // Try to find elements by text content using XPath
+        try {
+          // Try button with text content
+          let xpath = `//button[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), "${keyword.toLowerCase()}")]`;
+          let [xpathElement] = await this.page.$x(xpath);
+          if (xpathElement) {
+            this.logger?.debug('Element found by button text', { keyword, xpath });
+            return xpathElement;
+          }
+
+          // Try link with text content
+          xpath = `//a[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), "${keyword.toLowerCase()}")]`;
+          [xpathElement] = await this.page.$x(xpath);
+          if (xpathElement) {
+            this.logger?.debug('Element found by link text', { keyword, xpath });
+            return xpathElement;
+          }
+
+          // Try any clickable element with text content
+          xpath = `//*[@role='button' or @onclick or name()='button' or name()='a'][contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), "${keyword.toLowerCase()}")]`;
+          [xpathElement] = await this.page.$x(xpath);
+          if (xpathElement) {
+            this.logger?.debug('Element found by clickable text', { keyword, xpath });
+            return xpathElement;
+          }
+
+          // Try by partial text match
+          xpath = `//*[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), "${keyword.toLowerCase()}")]`;
+          [xpathElement] = await this.page.$x(xpath);
+          if (xpathElement) {
+            this.logger?.debug('Element found by partial text match', { keyword, xpath });
+            return xpathElement;
+          }
+        } catch (error) {
+          this.logger?.debug('XPath search failed for keyword', { keyword, error: error.message });
+          // XPath search failed, continue with other strategies
+        }
+      }
+    }
+
+    // Strategy 3: Try simplified selectors
+    const simplifiedSelectors = this.generateFallbackSelectors(selector);
+    for (const fallbackSelector of simplifiedSelectors) {
+      element = await this.page.$(fallbackSelector);
+      if (element) {
+        this.logger?.debug('Element found with fallback selector', {
+          original: selector,
+          fallback: fallbackSelector
+        });
+        return element;
+      }
+    }
+
+    // Strategy 4: Try to find similar elements and pick the most likely one
+    const baseSelector = selector.split(':')[0]; // Remove nth-of-type part
+    const elements = await this.page.$$(baseSelector);
+    
+    if (elements.length > 0) {
+      // If we have elements, try to pick the most relevant one
+      const targetIndex = this.extractNthIndex(selector);
+      const selectedElement = elements[Math.min(targetIndex - 1, elements.length - 1)] || elements[0];
+      
+      this.logger?.debug('Element found with base selector strategy', {
+        baseSelector,
+        totalFound: elements.length,
+        selectedIndex: Math.min(targetIndex - 1, elements.length - 1)
+      });
+      
+      return selectedElement;
+    }
+
+    this.logger?.warn('Element not found with any strategy', { selector, description });
+    return null;
+  }
+
+  /**
+   * Extract text keywords from description for element finding
+   * @param {string} description - Element description
+   * @returns {string[]} Array of keywords
+   */
+  extractTextKeywords(description) {
+    if (!description) return [];
+    
+    // Extract quoted text and common action words
+    const quotedText = description.match(/'([^']+)'/g) || description.match(/"([^"]+)"/g) || [];
+    const actionWords = description.match(/\b(sign up|login|submit|get|access|early|button|click)\b/gi) || [];
+    
+    const keywords = [
+      ...quotedText.map(text => text.replace(/['"]/g, '')),
+      ...actionWords
+    ];
+    
+    return [...new Set(keywords)]; // Remove duplicates
+  }
+
+  /**
+   * Generate fallback selectors from the original selector
+   * @param {string} selector - Original CSS selector
+   * @returns {string[]} Array of fallback selectors
+   */
+  generateFallbackSelectors(selector) {
+    const fallbacks = [];
+    
+    // Remove nth-of-type and try different indices
+    if (selector.includes(':nth-of-type(')) {
+      const baseSelector = selector.split(':nth-of-type(')[0];
+      const currentIndex = this.extractNthIndex(selector);
+      
+      // Try nearby indices
+      for (let i = Math.max(1, currentIndex - 2); i <= currentIndex + 2; i++) {
+        if (i !== currentIndex) {
+          fallbacks.push(`${baseSelector}:nth-of-type(${i})`);
+        }
+      }
+      
+      // Try first and last
+      fallbacks.push(`${baseSelector}:first-of-type`);
+      fallbacks.push(`${baseSelector}:last-of-type`);
+      
+      // Try without nth-of-type
+      fallbacks.push(baseSelector);
+    }
+    
+    // Try more generic selectors
+    if (selector.includes('button')) {
+      fallbacks.push('button', '[role="button"]', 'input[type="button"]', 'input[type="submit"]');
+    }
+    
+    if (selector.includes('input')) {
+      fallbacks.push('input', 'input[type="text"]', 'input[type="email"]');
+    }
+    
+    if (selector.includes('a')) {
+      fallbacks.push('a', 'a[href]');
+    }
+    
+    return fallbacks;
+  }
+
+  /**
+   * Extract nth index from selector
+   * @param {string} selector - CSS selector with nth-of-type
+   * @returns {number} Index number
+   */
+  extractNthIndex(selector) {
+    const match = selector.match(/:nth-of-type\((\d+)\)/);
+    return match ? parseInt(match[1], 10) : 1;
   }
 
   /**

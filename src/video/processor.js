@@ -133,17 +133,17 @@ export class VideoProcessor {
 
   /**
    * Add an audio segment to the recording
-   * @param {Buffer} audioBuffer - Audio data buffer
+   * @param {string|Buffer} audioData - Audio file path or buffer
    * @param {number} duration - Duration in milliseconds
    */
-  async addAudioSegment(audioBuffer, duration) {
+  async addAudioSegment(audioData, duration) {
     if (!this.isRecording) {
       this.logger?.warn('Cannot add audio segment: not recording');
       return;
     }
 
     const audioSegment = {
-      buffer: audioBuffer,
+      audioData, // Can be file path or buffer
       startTime: Date.now() - this.recordingStartTime,
       duration,
       segmentNumber: this.audioSegments.length,
@@ -155,7 +155,8 @@ export class VideoProcessor {
       segmentNumber: audioSegment.segmentNumber,
       startTime: audioSegment.startTime,
       duration,
-      size: audioBuffer.length,
+      isFilePath: typeof audioData === 'string',
+      size: typeof audioData === 'string' ? 'file' : audioData.length,
     });
   }
 
@@ -240,32 +241,74 @@ export class VideoProcessor {
       audioPath,
     });
 
-    return new Promise((resolve, reject) => {
-      const command = this.ffmpeg();
-
-      // Add audio segments with timing
-      this.audioSegments.forEach((segment, index) => {
-        const segmentPath = path.join(this.outputDir, `temp_audio_${index}.wav`);
+    try {
+      // Prepare audio segment files
+      const segmentPaths = [];
+      
+      for (let index = 0; index < this.audioSegments.length; index++) {
+        const segment = this.audioSegments[index];
         
-        // Save individual audio segment
-        fs.writeFile(segmentPath, segment.buffer).then(() => {
+        if (typeof segment.audioData === 'string') {
+          // Audio data is a file path, use it directly
+          segmentPaths.push(segment.audioData);
+        } else {
+          // Audio data is a buffer, save it to a temporary file
+          const segmentPath = path.join(this.outputDir, `temp_audio_${index}.wav`);
+          await fs.writeFile(segmentPath, segment.audioData);
+          segmentPaths.push(segmentPath);
+        }
+      }
+
+      // If we only have one segment, just copy it
+      if (segmentPaths.length === 1) {
+        return new Promise((resolve, reject) => {
+          this.ffmpeg()
+            .input(segmentPaths[0])
+            .audioCodec('pcm_s16le')
+            .output(audioPath)
+            .on('end', () => {
+              this.logger?.debug('Single audio track created successfully');
+              resolve(audioPath);
+            })
+            .on('error', (error) => {
+              this.logger?.error('Audio track creation failed', { error: error.message });
+              reject(error);
+            })
+            .run();
+        });
+      }
+
+      // Combine multiple audio segments
+      return new Promise((resolve, reject) => {
+        const command = this.ffmpeg();
+
+        // Add all audio segments as inputs
+        segmentPaths.forEach(segmentPath => {
           command.input(segmentPath);
         });
-      });
 
-      command
-        .audioCodec('pcm_s16le')
-        .output(audioPath)
-        .on('end', () => {
-          this.logger?.debug('Audio track created successfully');
-          resolve(audioPath);
-        })
-        .on('error', (error) => {
-          this.logger?.error('Audio track creation failed', { error: error.message });
-          reject(error);
-        })
-        .run();
-    });
+        // Create filter to concatenate audio segments
+        const filterComplex = segmentPaths.map((_, index) => `[${index}:0]`).join('') + `concat=n=${segmentPaths.length}:v=0:a=1[out]`;
+
+        command
+          .complexFilter(filterComplex)
+          .outputOptions(['-map', '[out]'])
+          .audioCodec('pcm_s16le')
+          .output(audioPath)
+          .on('end', () => {
+            this.logger?.debug('Combined audio track created successfully');
+            resolve(audioPath);
+          })
+          .on('error', (error) => {
+            this.logger?.error('Audio track creation failed', { error: error.message });
+            reject(error);
+          })
+          .run();
+      });
+    } catch (error) {
+      this.logger?.error('Audio track preparation failed', { error: error.message });
+      throw error;
+    }
   }
 
   /**
@@ -388,12 +431,16 @@ export class VideoProcessor {
       await Promise.all(deletePromises);
       await fs.rmdir(tempDir).catch(() => {});
 
-      // Remove temporary audio files
-      const audioFiles = this.audioSegments.map((_, index) => 
-        path.join(this.outputDir, `temp_audio_${index}.wav`)
-      );
+      // Remove temporary audio files (only those we created from buffers)
+      const audioFiles = [];
+      this.audioSegments.forEach((segment, index) => {
+        if (typeof segment.audioData !== 'string') {
+          // Only delete files we created from buffers
+          audioFiles.push(path.join(this.outputDir, `temp_audio_${index}.wav`));
+        }
+      });
       
-      const audioDeletePromises = audioFiles.map(file => 
+      const audioDeletePromises = audioFiles.map(file =>
         fs.unlink(file).catch(() => {})
       );
       
