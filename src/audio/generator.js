@@ -1,7 +1,10 @@
 import fetch from 'node-fetch';
 import fs from 'fs/promises';
 import path from 'path';
-import { logger } from '../utils/logger.js';
+import { createLogger } from '../utils/logger.js';
+
+// Create a simple logger instance for the audio generator
+const logger = createLogger({ level: 'info', enableFile: false });
 
 /**
  * Audio Generator Module
