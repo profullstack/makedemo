@@ -93,6 +93,11 @@ export async function createDemo(config) {
     );
 
     const transcriptSegments = [];
+    
+    // Select a consistent voice for the entire video
+    const { getRandomVoice } = await import('./audio/generator.js');
+    const selectedVoice = getRandomVoice(); // Pick one voice for the entire demo
+    logger.info('Selected consistent voice for entire demo', { voiceId: selectedVoice });
 
     // Execute planned interactions
     for (let i = 0; i < interactions.length; i++) {
@@ -107,9 +112,11 @@ export async function createDemo(config) {
       const narrationText = await aiDecisionMaker.generateNarration(interaction);
       transcriptSegments.push(narrationText);
 
-      // Generate audio for narration
+      // Generate audio for narration using the consistent voice
       const tempAudioPath = path.join(outputDir, `temp_audio_${i}.mp3`);
-      const audioPath = await generateSpeech(narrationText, tempAudioPath);
+      const audioPath = await generateSpeech(narrationText, tempAudioPath, {
+        voice: selectedVoice // Use the same voice throughout
+      });
       
       // Execute the interaction
       await browserManager.executeInteraction(interaction);
@@ -124,15 +131,17 @@ export async function createDemo(config) {
 
     logger.info('All interactions completed, finalizing video');
 
-    // Stop recording and process final video
+    // Stop recording first (this stops frame capture)
     await videoProcessor.stopRecording();
+    
+    // Now it's safe to close the browser since we're no longer capturing frames
+    await browserManager.close();
+    
+    // Process final video (this doesn't need the browser anymore)
     const finalVideoPath = await videoProcessor.finalizeVideo(outputFiles.video);
 
     // Save transcript
     await saveTranscript(outputFiles.transcript, transcriptSegments);
-
-    // Close browser
-    await browserManager.close();
 
     logger.info('Demo creation completed successfully', {
       videoPath: finalVideoPath,

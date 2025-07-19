@@ -125,6 +125,17 @@ export class VideoProcessor {
         size: screenshot.length,
       });
     } catch (error) {
+      // Check if this is a browser session closed error
+      if (error.message.includes('Session closed') || error.message.includes('Target closed')) {
+        this.logger?.debug('Browser session closed, stopping frame capture');
+        this.isRecording = false;
+        if (this.frameInterval) {
+          clearInterval(this.frameInterval);
+          this.frameInterval = null;
+        }
+        return;
+      }
+      
       this.logger?.error('Failed to capture frame', {
         error: error.message,
       });

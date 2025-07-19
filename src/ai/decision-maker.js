@@ -185,41 +185,85 @@ export class AIDecisionMaker {
     
     // Determine page type based on URL and elements
     let pageType = 'general';
+    let isLoggedIn = false;
+    
+    // Check for logged-in indicators
+    const loggedInIndicators = [
+      'dashboard', 'admin', 'app', 'workspace', 'console', 'panel',
+      'profile', 'account', 'settings', 'preferences', 'logout', 'signout'
+    ];
+    
+    const hasLoggedInElements = interactiveElements.some(el => {
+      const text = el.text.toLowerCase();
+      return loggedInIndicators.some(indicator => text.includes(indicator));
+    });
+    
+    const hasLoggedInUrl = loggedInIndicators.some(indicator => url.toLowerCase().includes(indicator));
+    
+    isLoggedIn = hasLoggedInElements || hasLoggedInUrl;
+    
+    // Determine specific page type
     if (url.includes('login') || url.includes('signin')) {
       pageType = 'login';
-    } else if (url.includes('dashboard') || url.includes('admin')) {
+    } else if (url.includes('dashboard') || url.includes('admin') || url.includes('app')) {
       pageType = 'dashboard';
+      isLoggedIn = true;
     } else if (url.includes('profile') || url.includes('account')) {
       pageType = 'profile';
+      isLoggedIn = true;
     } else if (url.includes('settings')) {
       pageType = 'settings';
+      isLoggedIn = true;
+    } else if (isLoggedIn) {
+      pageType = 'authenticated';
     }
 
-    // Identify key elements
+    // Identify key elements, filtering out waitlist/signup if logged in
     const keyElements = interactiveElements.filter(el => {
       const text = el.text.toLowerCase();
-      const isImportant = 
+      
+      // Skip waitlist/signup elements if user appears to be logged in
+      if (isLoggedIn) {
+        const skipPatterns = [
+          'waitlist', 'join waitlist', 'subscribe', 'sign up', 'signup',
+          'get started', 'try free', 'free trial', 'register'
+        ];
+        
+        if (skipPatterns.some(pattern => text.includes(pattern))) {
+          return false;
+        }
+      }
+      
+      const isImportant =
         el.tag === 'button' ||
         text.includes('submit') ||
         text.includes('save') ||
         text.includes('create') ||
         text.includes('delete') ||
         text.includes('edit') ||
-        text.includes('login') ||
-        text.includes('signup') ||
+        text.includes('view') ||
+        text.includes('open') ||
+        text.includes('manage') ||
+        text.includes('configure') ||
+        text.includes('settings') ||
+        text.includes('dashboard') ||
+        text.includes('menu') ||
+        text.includes('nav') ||
+        (!isLoggedIn && (text.includes('login') || text.includes('signup'))) ||
         el.type === 'submit';
       
       return isImportant;
     });
 
     // Suggest potential actions
-    const suggestedActions = this.generateActionSuggestions(pageType, keyElements);
+    const suggestedActions = this.generateActionSuggestions(pageType, keyElements, isLoggedIn);
 
     return {
       pageType,
       keyElements,
       suggestedActions,
       elementCount: interactiveElements.length,
+      isLoggedIn,
     };
   }
 
@@ -240,6 +284,13 @@ export class AIDecisionMaker {
           content: `You are an AI that creates demo interactions for websites. Generate a JSON array of interactions that would showcase the website's features effectively. Each interaction should have: type, selector, description, reasoning, and duration (in milliseconds).
 
 Supported interaction types: ${this.supportedInteractions.join(', ')}
+
+IMPORTANT RULES:
+1. If the user appears to be logged in (dashboard, app interface, authenticated pages), focus on demonstrating ACTUAL APP FEATURES, not signup/waitlist actions
+2. Avoid "Subscribe to waitlist", "Join waitlist", "Sign up" buttons if the user is already in the app
+3. Prioritize functional interactions that show what the app actually does
+4. Look for navigation menus, feature buttons, data displays, settings, and core functionality
+5. Create a logical flow that demonstrates the app's value proposition
 
 Focus on the most important and demonstrative actions. Limit to ${this.maxInteractions} interactions maximum.`,
         },
@@ -279,17 +330,35 @@ Focus on the most important and demonstrative actions. Limit to ${this.maxIntera
    * @returns {string} Formatted prompt
    */
   createInteractionPrompt(pageState, analysis) {
+    const loginStatus = analysis.isLoggedIn ? 'LOGGED IN (authenticated user)' : 'NOT LOGGED IN (visitor)';
+    
     return `
 Analyze this webpage and create a demo interaction plan:
 
 URL: ${pageState.url}
 Title: ${pageState.title}
 Page Type: ${analysis.pageType}
+User Status: ${loginStatus}
 
 Available Interactive Elements:
-${analysis.keyElements.map(el => 
+${analysis.keyElements.map(el =>
   `- ${el.tag}${el.type ? `[${el.type}]` : ''}: "${el.text}" (selector: ${el.selector})`
 ).join('\n')}
+
+Suggested Actions: ${analysis.suggestedActions.join(', ')}
+
+IMPORTANT INSTRUCTIONS:
+${analysis.isLoggedIn ? `
+- The user is LOGGED IN, so focus on demonstrating ACTUAL APP FEATURES
+- Avoid signup/waitlist/registration actions since the user is already authenticated
+- Prioritize functional interactions that show the app's core value proposition
+- Look for navigation menus, feature buttons, data displays, settings, and tools
+- Create a logical flow that demonstrates what the app actually does for users
+` : `
+- The user is NOT LOGGED IN, so focus on exploration and authentication if needed
+- You may include signup/login actions if they lead to demonstrating app features
+- Focus on showcasing the app's value proposition to encourage signup
+`}
 
 Create a logical sequence of interactions that would effectively demonstrate this website's functionality. Each interaction should be meaningful and showcase key features.
 
@@ -331,29 +400,48 @@ Generate a brief, professional narration (1-2 sentences) that explains what's ha
    * @param {Array} keyElements - Key interactive elements
    * @returns {Array} Suggested actions
    */
-  generateActionSuggestions(pageType, keyElements) {
+  generateActionSuggestions(pageType, keyElements, isLoggedIn = false) {
     const suggestions = [];
     
-    switch (pageType) {
-      case 'login':
-        suggestions.push('Fill login form', 'Submit credentials');
-        break;
-      case 'dashboard':
-        suggestions.push('Navigate sections', 'View data', 'Access features');
-        break;
-      case 'profile':
-        suggestions.push('Edit profile', 'Update settings', 'Save changes');
-        break;
-      default:
-        suggestions.push('Explore navigation', 'Interact with content', 'Demonstrate features');
+    if (isLoggedIn) {
+      // Focus on app functionality when logged in
+      switch (pageType) {
+        case 'dashboard':
+        case 'authenticated':
+          suggestions.push('Navigate main features', 'Explore dashboard sections', 'Access core functionality', 'View data and analytics');
+          break;
+        case 'profile':
+          suggestions.push('Edit profile information', 'Update account settings', 'Manage preferences');
+          break;
+        case 'settings':
+          suggestions.push('Configure application settings', 'Update preferences', 'Manage account options');
+          break;
+        default:
+          suggestions.push('Explore app features', 'Navigate interface', 'Demonstrate core functionality');
+      }
+    } else {
+      // Standard suggestions for non-authenticated users
+      switch (pageType) {
+        case 'login':
+          suggestions.push('Fill login form', 'Submit credentials');
+          break;
+        default:
+          suggestions.push('Explore navigation', 'Interact with content', 'Demonstrate features');
+      }
     }
 
-    // Add element-specific suggestions
+    // Add element-specific suggestions based on available actions
     keyElements.forEach(el => {
       const text = el.text.toLowerCase();
       if (text.includes('create')) suggestions.push('Create new item');
       if (text.includes('search')) suggestions.push('Perform search');
       if (text.includes('filter')) suggestions.push('Apply filters');
+      if (text.includes('manage')) suggestions.push('Manage resources');
+      if (text.includes('view')) suggestions.push('View details');
+      if (text.includes('edit')) suggestions.push('Edit content');
+      if (text.includes('configure')) suggestions.push('Configure settings');
+      if (text.includes('dashboard')) suggestions.push('Access dashboard');
+      if (text.includes('menu')) suggestions.push('Navigate menu');
     });
 
     return [...new Set(suggestions)]; // Remove duplicates
