@@ -27,7 +27,9 @@ async function main() {
   } catch (error) {
     console.error(chalk.red('Error:'), error.message);
     
-    if (options?.verbose) {
+    // Try to get options from the parsed result for verbose logging
+    const parsedResult = parseArguments(process.argv.slice(2));
+    if (parsedResult?.options?.verbose) {
       console.error(chalk.gray(error.stack));
     }
     

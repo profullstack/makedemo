@@ -10,9 +10,9 @@
   "scripts": {
     "start": "node src/index.js",
     "setup": "node scripts/setup.js",
-    "test": "mocha test/**/*.test.js --recursive",
-    "test:watch": "mocha test/**/*.test.js --recursive --watch",
-    "test:coverage": "c8 mocha test/**/*.test.js --recursive",
+    "test": "mocha test/**/*.test.js --recursive --loader=esmock",
+    "test:watch": "mocha test/**/*.test.js --recursive --watch --loader=esmock",
+    "test:coverage": "c8 mocha test/**/*.test.js --recursive --loader=esmock",
     "lint": "eslint src/ test/",
     "lint:fix": "eslint src/ test/ --fix",
     "format": "prettier --write src/ test/",

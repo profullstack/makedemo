@@ -4,7 +4,7 @@ import { ensureOutputDirectory } from './utils/filesystem.js';
 import { BrowserManager } from './browser/manager.js';
 import { AuthenticationHandler } from './auth/handler.js';
 import { AIDecisionMaker } from './ai/decision-maker.js';
-import { AudioGenerator } from './audio/generator.js';
+import { generateSpeech, estimateAudioDuration } from './audio/generator.js';
 import { VideoProcessor } from './video/processor.js';
 import path from 'path';
 
@@ -55,7 +55,7 @@ export async function createDemo(config) {
     const browserManager = new BrowserManager({ headless, logger });
     const authHandler = new AuthenticationHandler({ logger });
     const aiDecisionMaker = new AIDecisionMaker({ logger, maxInteractions });
-    const audioGenerator = new AudioGenerator({ logger });
+    // Audio generation will use the function-based API
     const videoProcessor = new VideoProcessor({ logger, outputDir });
 
     // Generate timestamp for file naming
@@ -108,13 +108,15 @@ export async function createDemo(config) {
       transcriptSegments.push(narrationText);
 
       // Generate audio for narration
-      const audioBuffer = await audioGenerator.generateSpeech(narrationText);
+      const tempAudioPath = path.join(outputDir, `temp_audio_${i}.mp3`);
+      const audioPath = await generateSpeech(narrationText, tempAudioPath);
       
       // Execute the interaction
       await browserManager.executeInteraction(interaction);
       
       // Add the audio to video timeline
-      await videoProcessor.addAudioSegment(audioBuffer, interaction.duration);
+      const estimatedDuration = estimateAudioDuration(narrationText);
+      await videoProcessor.addAudioSegment(audioPath, estimatedDuration);
       
       // Wait for page to settle
       await new Promise(resolve => setTimeout(resolve, 2000));

@@ -1,165 +1,231 @@
 import { expect } from 'chai';
-import { AudioGenerator } from '../src/audio/generator.js';
-import { createLogger } from '../src/utils/logger.js';
+import { 
+  generateSpeech, 
+  getAvailableVoices, 
+  estimateAudioDuration,
+  VOICES,
+  getRandomVoice,
+  getMaleVoices,
+  getFemaleVoices,
+  CONVERSATIONAL_VOICE_SETTINGS,
+  DEFAULT_VOICE_SETTINGS
+} from '../src/audio/generator.js';
+import fs from 'fs/promises';
+import path from 'path';
 
 describe('Audio Generator', () => {
-  let audioGenerator;
-  let logger;
+  const testOutputDir = './test-output';
+  const testAudioPath = path.join(testOutputDir, 'test-audio.mp3');
 
-  beforeEach(() => {
-    logger = createLogger({ level: 'error', enableFile: false });
-    audioGenerator = new AudioGenerator({ logger });
+  beforeEach(async () => {
+    // Ensure test output directory exists
+    await fs.mkdir(testOutputDir, { recursive: true });
   });
 
-  describe('initialization', () => {
-    it('should create audio generator with default options', () => {
-      const generator = new AudioGenerator({ logger });
+  afterEach(async () => {
+    // Clean up test files
+    try {
+      await fs.unlink(testAudioPath);
+    } catch {
+      // Ignore if file doesn't exist
+    }
+  });
+
+  describe('Voice Management', () => {
+    it('should have predefined voices', () => {
+      expect(VOICES).to.be.an('object');
+      expect(Object.keys(VOICES)).to.have.length.greaterThan(0);
       
-      expect(generator).to.have.property('logger');
-      expect(generator).to.have.property('voiceId');
-      expect(generator).to.have.property('model');
+      // Check that we have both male and female voices
+      expect(VOICES).to.have.property('rachel');
+      expect(VOICES).to.have.property('adam');
     });
 
-    it('should create audio generator with custom options', () => {
-      const generator = new AudioGenerator({
-        logger,
-        voiceId: 'custom-voice-id',
-        model: 'eleven_multilingual_v2',
-      });
+    it('should get male voices', () => {
+      const maleVoices = getMaleVoices();
       
-      expect(generator.voiceId).to.equal('custom-voice-id');
-      expect(generator.model).to.equal('eleven_multilingual_v2');
+      expect(maleVoices).to.be.an('object');
+      expect(maleVoices).to.have.property('antoni');
+      expect(maleVoices).to.have.property('adam');
+      expect(maleVoices).to.not.have.property('rachel');
+    });
+
+    it('should get female voices', () => {
+      const femaleVoices = getFemaleVoices();
+      
+      expect(femaleVoices).to.be.an('object');
+      expect(femaleVoices).to.have.property('rachel');
+      expect(femaleVoices).to.have.property('bella');
+      expect(femaleVoices).to.not.have.property('adam');
+    });
+
+    it('should get random voice', () => {
+      const randomVoice = getRandomVoice();
+      
+      expect(randomVoice).to.be.a('string');
+      expect(Object.values(VOICES)).to.include(randomVoice);
+    });
+
+    it('should get random male voice', () => {
+      const maleVoice = getRandomVoice('male');
+      const maleVoices = getMaleVoices();
+      
+      expect(maleVoice).to.be.a('string');
+      expect(Object.values(maleVoices)).to.include(maleVoice);
+    });
+
+    it('should get random female voice', () => {
+      const femaleVoice = getRandomVoice('female');
+      const femaleVoices = getFemaleVoices();
+      
+      expect(femaleVoice).to.be.a('string');
+      expect(Object.values(femaleVoices)).to.include(femaleVoice);
+    });
+  });
+
+  describe('Voice Settings', () => {
+    it('should have default voice settings', () => {
+      expect(DEFAULT_VOICE_SETTINGS).to.be.an('object');
+      expect(DEFAULT_VOICE_SETTINGS).to.have.property('stability');
+      expect(DEFAULT_VOICE_SETTINGS).to.have.property('similarity_boost');
+      expect(DEFAULT_VOICE_SETTINGS).to.have.property('style');
+      expect(DEFAULT_VOICE_SETTINGS).to.have.property('use_speaker_boost');
+    });
+
+    it('should have conversational voice settings', () => {
+      expect(CONVERSATIONAL_VOICE_SETTINGS).to.be.an('object');
+      expect(CONVERSATIONAL_VOICE_SETTINGS).to.have.property('stability');
+      expect(CONVERSATIONAL_VOICE_SETTINGS).to.have.property('similarity_boost');
+      expect(CONVERSATIONAL_VOICE_SETTINGS).to.have.property('style');
+      expect(CONVERSATIONAL_VOICE_SETTINGS).to.have.property('use_speaker_boost');
     });
   });
 
   describe('generateSpeech', () => {
-    it('should generate speech from text', async () => {
-      const text = 'Hello, this is a test narration.';
+    it('should generate speech from text (mock mode)', async () => {
+      const text = 'Hello, this is a test narration for our demo video.';
       
-      // Mock ElevenLabs API response
-      audioGenerator.elevenlabs = {
-        generate: async () => Buffer.from('fake-audio-data'),
-      };
-
-      const audioBuffer = await audioGenerator.generateSpeech(text);
+      // This will use mock implementation since no API key is set
+      const outputPath = await generateSpeech(text, testAudioPath);
       
-      expect(audioBuffer).to.be.instanceOf(Buffer);
-      expect(audioBuffer.length).to.be.greaterThan(0);
+      expect(outputPath).to.equal(testAudioPath);
+      
+      // Verify file was created
+      const stats = await fs.stat(testAudioPath);
+      expect(stats.size).to.be.greaterThan(0);
     });
 
     it('should handle empty text input', async () => {
       try {
-        await audioGenerator.generateSpeech('');
+        await generateSpeech('', testAudioPath);
         expect.fail('Should have thrown an error');
       } catch (error) {
         expect(error.message).to.include('Text is required');
       }
     });
 
-    it('should handle API errors gracefully', async () => {
-      audioGenerator.elevenlabs = {
-        generate: async () => {
-          throw new Error('API Error');
-        },
-      };
-
+    it('should handle null text input', async () => {
       try {
-        await audioGenerator.generateSpeech('Test text');
+        await generateSpeech(null, testAudioPath);
         expect.fail('Should have thrown an error');
       } catch (error) {
-        expect(error.message).to.include('Failed to generate speech');
+        expect(error.message).to.include('Text is required');
       }
     });
 
-    it('should respect voice settings', async () => {
-      let capturedOptions;
-      
-      audioGenerator.elevenlabs = {
-        generate: async (options) => {
-          capturedOptions = options;
-          return Buffer.from('fake-audio-data');
-        },
+    it('should handle whitespace-only text', async () => {
+      try {
+        await generateSpeech('   \n\t   ', testAudioPath);
+        expect.fail('Should have thrown an error');
+      } catch (error) {
+        expect(error.message).to.include('Text is required');
+      }
+    });
+
+    it('should accept custom voice options', async () => {
+      const text = 'Testing custom voice options.';
+      const options = {
+        voice: VOICES.rachel,
+        gender: 'female',
+        voiceSettings: {
+          stability: 0.8,
+          similarity_boost: 0.9,
+          style: 0.1,
+          use_speaker_boost: true
+        }
       };
-
-      await audioGenerator.generateSpeech('Test text', {
-        stability: 0.8,
-        similarityBoost: 0.7,
-      });
       
-      expect(capturedOptions).to.have.property('voice_settings');
-      expect(capturedOptions.voice_settings.stability).to.equal(0.8);
-      expect(capturedOptions.voice_settings.similarity_boost).to.equal(0.7);
+      const outputPath = await generateSpeech(text, testAudioPath, options);
+      
+      expect(outputPath).to.equal(testAudioPath);
+      
+      // Verify file was created
+      const stats = await fs.stat(testAudioPath);
+      expect(stats.size).to.be.greaterThan(0);
+    });
+
+    it('should validate gender parameter', async () => {
+      const text = 'Testing invalid gender parameter.';
+      const options = { gender: 'invalid' };
+      
+      try {
+        await generateSpeech(text, testAudioPath, options);
+        expect.fail('Should have thrown an error');
+      } catch (error) {
+        expect(error.message).to.include('Gender must be');
+      }
+    });
+
+    it('should create output directory if it does not exist', async () => {
+      const nestedPath = path.join(testOutputDir, 'nested', 'deep', 'audio.mp3');
+      const text = 'Testing directory creation.';
+      
+      const outputPath = await generateSpeech(text, nestedPath);
+      
+      expect(outputPath).to.equal(nestedPath);
+      
+      // Verify file was created in nested directory
+      const stats = await fs.stat(nestedPath);
+      expect(stats.size).to.be.greaterThan(0);
+      
+      // Clean up nested directory
+      await fs.rm(path.join(testOutputDir, 'nested'), { recursive: true, force: true });
     });
   });
 
-  describe('validateText', () => {
-    it('should validate correct text input', () => {
-      const text = 'This is a valid narration text.';
+  describe('getAvailableVoices', () => {
+    it('should return predefined voices when no API key', async () => {
+      // This will return predefined voices since no API key is set
+      const voices = await getAvailableVoices();
       
-      const isValid = audioGenerator.validateText(text);
+      expect(voices).to.be.an('array');
+      expect(voices.length).to.be.greaterThan(0);
       
-      expect(isValid).to.be.true;
+      // Check structure of returned voices
+      const voice = voices[0];
+      expect(voice).to.have.property('voice_id');
+      expect(voice).to.have.property('name');
+      expect(voice).to.have.property('category');
     });
 
-    it('should reject empty or whitespace-only text', () => {
-      expect(audioGenerator.validateText('')).to.be.false;
-      expect(audioGenerator.validateText('   ')).to.be.false;
-      expect(audioGenerator.validateText('\n\t')).to.be.false;
-    });
-
-    it('should reject text that is too long', () => {
-      const longText = 'a'.repeat(6000); // Assuming 5000 char limit
+    it('should include both male and female voices', async () => {
+      const voices = await getAvailableVoices();
       
-      const isValid = audioGenerator.validateText(longText);
+      const maleVoices = voices.filter(v => v.category === 'Male');
+      const femaleVoices = voices.filter(v => v.category === 'Female');
       
-      expect(isValid).to.be.false;
-    });
-
-    it('should accept text within character limits', () => {
-      const normalText = 'a'.repeat(1000);
-      
-      const isValid = audioGenerator.validateText(normalText);
-      
-      expect(isValid).to.be.true;
-    });
-  });
-
-  describe('optimizeTextForSpeech', () => {
-    it('should clean up text for better speech synthesis', () => {
-      const rawText = 'Click the "Submit" button & wait for response...';
-      
-      const optimized = audioGenerator.optimizeTextForSpeech(rawText);
-      
-      expect(optimized).to.not.include('"');
-      expect(optimized).to.not.include('&');
-      expect(optimized).to.not.include('...');
-    });
-
-    it('should handle URLs in text', () => {
-      const textWithUrl = 'Navigate to https://example.com for more info.';
-      
-      const optimized = audioGenerator.optimizeTextForSpeech(textWithUrl);
-      
-      expect(optimized).to.include('example dot com');
-    });
-
-    it('should handle special characters', () => {
-      const textWithSpecialChars = 'Price: $29.99 (50% off!)';
-      
-      const optimized = audioGenerator.optimizeTextForSpeech(textWithSpecialChars);
-      
-      expect(optimized).to.include('dollars');
-      expect(optimized).to.include('percent');
+      expect(maleVoices.length).to.be.greaterThan(0);
+      expect(femaleVoices.length).to.be.greaterThan(0);
     });
   });
 
   describe('estimateAudioDuration', () => {
     it('should estimate duration based on text length', () => {
       const shortText = 'Hello world.';
-      const longText = 'This is a much longer piece of text that should take more time to speak aloud.';
+      const longText = 'This is a much longer piece of text that should take significantly more time to speak aloud when converted to speech audio.';
       
-      const shortDuration = audioGenerator.estimateAudioDuration(shortText);
-      const longDuration = audioGenerator.estimateAudioDuration(longText);
+      const shortDuration = estimateAudioDuration(shortText);
+      const longDuration = estimateAudioDuration(longText);
       
       expect(shortDuration).to.be.a('number');
       expect(longDuration).to.be.a('number');
@@ -167,35 +233,78 @@ describe('Audio Generator', () => {
     });
 
     it('should return reasonable duration estimates', () => {
-      const text = 'This is a test sentence for duration estimation.';
+      const text = 'This is a test sentence for duration estimation that contains a reasonable amount of words.';
       
-      const duration = audioGenerator.estimateAudioDuration(text);
+      const duration = estimateAudioDuration(text);
       
-      // Should be between 2-10 seconds for this length
-      expect(duration).to.be.greaterThan(2000);
-      expect(duration).to.be.lessThan(10000);
+      // Should be between 3-15 seconds for this length (155 words per minute average)
+      expect(duration).to.be.greaterThan(3);
+      expect(duration).to.be.lessThan(15);
+    });
+
+    it('should handle empty text', () => {
+      expect(estimateAudioDuration('')).to.equal(0);
+      expect(estimateAudioDuration(null)).to.equal(0);
+      expect(estimateAudioDuration(undefined)).to.equal(0);
+    });
+
+    it('should handle non-string input', () => {
+      expect(estimateAudioDuration(123)).to.equal(0);
+      expect(estimateAudioDuration({})).to.equal(0);
+      expect(estimateAudioDuration([])).to.equal(0);
     });
   });
 
-  describe('saveAudioToFile', () => {
-    it('should save audio buffer to file', async () => {
-      const audioBuffer = Buffer.from('fake-audio-data');
-      const filePath = './test-audio.mp3';
+  describe('Text Processing', () => {
+    it('should handle long text by truncating appropriately', async () => {
+      // Create text longer than 4500 characters
+      const longText = 'This is a very long text. '.repeat(200);
       
-      // Mock fs operations
-      const mockFs = {
-        writeFile: async (path, data) => {
-          expect(path).to.equal(filePath);
-          expect(data).to.equal(audioBuffer);
-        },
-      };
+      const outputPath = await generateSpeech(longText, testAudioPath);
       
-      audioGenerator.fs = mockFs;
+      expect(outputPath).to.equal(testAudioPath);
       
-      await audioGenerator.saveAudioToFile(audioBuffer, filePath);
+      // Verify file was created (text should be truncated internally)
+      const stats = await fs.stat(testAudioPath);
+      expect(stats.size).to.be.greaterThan(0);
+    });
+
+    it('should handle text with special characters', async () => {
+      const textWithSpecialChars = 'Navigate to https://example.com & click "Submit" button! Price: $29.99 (50% off)';
       
-      // Test passes if no error is thrown
-      expect(true).to.be.true;
+      const outputPath = await generateSpeech(textWithSpecialChars, testAudioPath);
+      
+      expect(outputPath).to.equal(testAudioPath);
+      
+      // Verify file was created
+      const stats = await fs.stat(testAudioPath);
+      expect(stats.size).to.be.greaterThan(0);
+    });
+
+    it('should enhance text for natural speech', async () => {
+      const text = 'Welcome to our demo! This is amazing. Overall, this is excellent.';
+      
+      const outputPath = await generateSpeech(text, testAudioPath);
+      
+      expect(outputPath).to.equal(testAudioPath);
+      
+      // Verify file was created (text enhancement happens internally)
+      const stats = await fs.stat(testAudioPath);
+      expect(stats.size).to.be.greaterThan(0);
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should handle file system errors gracefully', async () => {
+      const invalidPath = '/invalid/path/that/does/not/exist/audio.mp3';
+      const text = 'Testing file system error handling.';
+      
+      try {
+        await generateSpeech(text, invalidPath);
+        expect.fail('Should have thrown an error');
+      } catch (error) {
+        expect(error.message).to.include('Failed to generate speech');
+      }
     });
   });
 });
