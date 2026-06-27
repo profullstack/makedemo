@@ -26,6 +26,12 @@ const hasClaude = () => Boolean(process.env.ANTHROPIC_API_KEY);
 const hasAI = () => hasOpenAI() || hasClaude();
 const hasElevenLabs = () => Boolean(process.env.ELEVENLABS_API_KEY);
 
+// Subtle bottom-right "makedemo.app" wordmark for free-tier renders. Uses
+// fontconfig's default font (Liberation/Noto are present in the container).
+const WATERMARK_FILTER =
+  "drawtext=text='makedemo.app':fontcolor=white@0.45:fontsize=30:" +
+  'x=w-tw-36:y=h-th-28:shadowcolor=black@0.5:shadowx=1:shadowy=1';
+
 /** Minimal logger that forwards into the job event stream. */
 const makeLogger = (emit) => ({
   info: (msg) => emit('log', { level: 'info', msg }),
@@ -210,6 +216,11 @@ export async function runRenderStage(job, emit) {
   const jobDir = path.join(OUTPUT_ROOT, job.id);
   emit('stage', { stage: 'render', status: 'running' });
 
+  // Free tier carries a subtle makedemo.app watermark (bottom-right).
+  // Paid renders pass job.watermark === false to omit it.
+  const baseVf = 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=0x0d0c0f,format=yuv420p';
+  const vf = job.watermark === false ? baseVf : `${baseVf},${WATERMARK_FILTER}`;
+
   const clipPaths = [];
   for (let i = 0; i < job.steps.length; i++) {
     const step = job.steps[i];
@@ -224,7 +235,7 @@ export async function runRenderStage(job, emit) {
       '-loop', '1', '-i', imagePath,
       '-i', audioPath,
       '-t', String(duration),
-      '-vf', 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=0x0d0c0f,format=yuv420p',
+      '-vf', vf,
       '-r', '30',
       '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'stillimage',
       '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
