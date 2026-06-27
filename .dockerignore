@@ -1,0 +1,9 @@
+.git
+node_modules
+**/node_modules
+apps/web/output
+output
+.env
+.env.*
+legacy
+*.log

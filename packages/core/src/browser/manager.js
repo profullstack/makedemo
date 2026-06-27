@@ -26,6 +26,9 @@ export class BrowserManager {
     try {
       this.browser = await puppeteer.launch({
         headless: this.headless,
+        // Honour a system Chromium when provided (containers, CI) instead of
+        // Puppeteer's bundled download.
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
