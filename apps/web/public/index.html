@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>makedemo — turn any URL into a narrated demo film</title>
+  <meta name="description" content="Paste a URL. makedemo walks the site, writes a script, voices the narration, and renders a finished MP4 demo video." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="sprocket sprocket--left" aria-hidden="true"></div>
+  <div class="sprocket sprocket--right" aria-hidden="true"></div>
+
+  <main class="stage">
+    <header class="masthead">
+      <div class="kicker">
+        <span class="rec"></span> REC · MAKEDEMO STUDIO
+      </div>
+      <h1 class="title">
+        Paste a link.<br />
+        Get a <em>narrated</em> demo film.
+      </h1>
+      <p class="lede">
+        makedemo drives a real browser through your site, writes the script,
+        voices the narration, and renders a finished <span class="mono">1080p&nbsp;MP4</span> —
+        no editor, no timeline, no actors.
+      </p>
+    </header>
+
+    <!-- Capture bar -->
+    <section class="console" id="console">
+      <form id="demo-form" class="slate" autocomplete="off">
+        <div class="slate__top">
+          <span class="slate__id">SCENE 01 — TAKE 01</span>
+          <span class="slate__id slate__id--dim" id="env-badge">checking engine…</span>
+        </div>
+
+        <div class="capture">
+          <span class="capture__proto">https://</span>
+          <input
+            id="url"
+            class="capture__input"
+            type="text"
+            inputmode="url"
+            placeholder="your-app.com"
+            aria-label="Website URL"
+            required
+          />
+          <button type="submit" class="roll" id="roll-btn">
+            <span class="roll__dot"></span>
+            <span class="roll__label">Roll demo</span>
+          </button>
+        </div>
+
+        <button type="button" class="adv-toggle" id="adv-toggle" aria-expanded="false">
+          + scene direction (steps, voice, login)
+        </button>
+
+        <div class="adv" id="adv" hidden>
+          <label class="field">
+            <span>Beats</span>
+            <input id="maxSteps" type="number" min="1" max="12" value="6" />
+          </label>
+          <label class="field">
+            <span>Voice</span>
+            <select id="voice">
+              <option value="">Auto (random pro voice)</option>
+              <option value="21m00Tcm4TlvDq8ikWAM">Rachel — clear, trustworthy</option>
+              <option value="ErXwobaYiN019PkySvjV">Antoni — professional</option>
+              <option value="onwK4e9ZLuTAKqWW03F9">Jake — upbeat</option>
+              <option value="XB0fDUnXU5powFXDhCwa">Charlotte — smooth</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Login user <i>(optional)</i></span>
+            <input id="user" type="text" placeholder="email" />
+          </label>
+          <label class="field">
+            <span>Password <i>(optional)</i></span>
+            <input id="password" type="password" placeholder="••••••••" />
+          </label>
+        </div>
+      </form>
+    </section>
+
+    <!-- Production view -->
+    <section class="production" id="production" hidden>
+      <div class="rail" id="rail">
+        <div class="rail__step" data-stage="script">
+          <span class="rail__num">1</span>
+          <div class="rail__body"><b>Script</b><small>walk &amp; write</small></div>
+          <span class="rail__status" data-status>idle</span>
+        </div>
+        <div class="rail__step" data-stage="assets">
+          <span class="rail__num">2</span>
+          <div class="rail__body"><b>Assets</b><small>voice &amp; frames</small></div>
+          <span class="rail__status" data-status>idle</span>
+        </div>
+        <div class="rail__step" data-stage="render">
+          <span class="rail__num">3</span>
+          <div class="rail__body"><b>Render</b><small>cut the MP4</small></div>
+          <span class="rail__status" data-status>idle</span>
+        </div>
+      </div>
+
+      <div class="log" id="log" aria-live="polite"></div>
+    </section>
+
+    <!-- Result -->
+    <section class="result" id="result" hidden>
+      <div class="player">
+        <video id="video" controls playsinline></video>
+      </div>
+      <div class="result__meta">
+        <h2 id="result-title">Your demo is ready.</h2>
+        <div class="result__actions">
+          <a id="download" class="btn btn--amber" download>Download MP4</a>
+          <a id="transcript-link" class="btn btn--ghost" target="_blank">Transcript</a>
+          <button id="again" class="btn btn--ghost" type="button">New demo</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Storyboard -->
+    <section class="storyboard" id="storyboard" hidden>
+      <h3 class="storyboard__head">Storyboard</h3>
+      <div class="filmstrip" id="filmstrip"></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span class="mono">makedemo.app</span>
+    <span>browser automation · GPT script · ElevenLabs voice · ffmpeg cut</span>
+  </footer>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

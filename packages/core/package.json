@@ -1,0 +1,28 @@
+{
+  "name": "@makedemo/core",
+  "version": "1.0.0",
+  "description": "Shared demo-generation pipeline: browser automation, AI scripting, narration, and video processing.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./browser": "./src/browser/manager.js",
+    "./ai": "./src/ai/decision-maker.js",
+    "./audio": "./src/audio/generator.js",
+    "./auth": "./src/auth/handler.js",
+    "./video": "./src/video/processor.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.1",
+    "elevenlabs": "^0.8.2",
+    "fluent-ffmpeg": "^2.1.2",
+    "fs-extra": "^11.2.0",
+    "node-fetch": "^3.3.2",
+    "openai": "^4.28.4",
+    "puppeteer": "^21.11.0",
+    "winston": "^3.11.0"
+  }
+}

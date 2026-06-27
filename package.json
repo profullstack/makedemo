@@ -8,7 +8,10 @@
     "mkdemo": "./src/cli/index.js"
   },
   "scripts": {
-    "start": "node src/index.js",
+    "web": "node apps/web/server.js",
+    "web:dev": "node --watch apps/web/server.js",
+    "start": "node apps/web/server.js",
+    "cli": "node src/index.js",
     "setup": "node scripts/setup.js",
     "test": "NODE_OPTIONS='--loader=./node_modules/mocha/lib/nodejs/esm-utils.js' mocha test/**/*.test.js --recursive",
     "test:watch": "NODE_OPTIONS='--loader=./node_modules/mocha/lib/nodejs/esm-utils.js' mocha test/**/*.test.js --recursive --watch",
@@ -38,6 +41,8 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "hono": "^4.6.14",
     "chalk": "^5.3.0",
     "commander": "^11.1.0",
     "dotenv": "^16.4.1",

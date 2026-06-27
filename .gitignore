@@ -115,3 +115,5 @@ Thumbs.db
 
 # FFmpeg temporary files
 ffmpeg_*.log
+# web app generated artifacts
+apps/web/output/
