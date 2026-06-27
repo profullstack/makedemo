@@ -16,6 +16,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.69.0",
     "dotenv": "^16.4.1",
     "elevenlabs": "^0.8.2",
     "fluent-ffmpeg": "^2.1.2",

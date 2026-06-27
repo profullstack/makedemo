@@ -20,6 +20,10 @@ export const OUTPUT_ROOT = process.env.OUTPUT_DIR
   : path.resolve(__dirname, '../output');
 
 const hasOpenAI = () => Boolean(process.env.OPENAI_API_KEY);
+const hasClaude = () => Boolean(process.env.ANTHROPIC_API_KEY);
+// AI scripting works with either provider; AIDecisionMaker falls back from
+// OpenAI to Claude automatically (e.g. when OpenAI quota is exhausted).
+const hasAI = () => hasOpenAI() || hasClaude();
 const hasElevenLabs = () => Boolean(process.env.ELEVENLABS_API_KEY);
 
 /** Minimal logger that forwards into the job event stream. */
@@ -61,10 +65,10 @@ export async function runScriptStage(job, emit) {
     const ai = new AIDecisionMaker({ logger, maxInteractions: job.maxSteps });
 
     let interactions = [];
-    let useAI = hasOpenAI();
+    let useAI = hasAI();
     if (useAI) {
       try {
-        logger.info('Planning interactions with OpenAI');
+        logger.info(hasOpenAI() ? 'Planning interactions with OpenAI (Claude fallback ready)' : 'Planning interactions with Claude');
         interactions = await ai.planInteractions(page);
       } catch (err) {
         logger.warn(`AI planning failed (${err.message}) — falling back to a heuristic storyboard`);
@@ -72,7 +76,7 @@ export async function runScriptStage(job, emit) {
         interactions = [];
       }
     } else {
-      logger.warn('No OPENAI_API_KEY — generating a heuristic storyboard');
+      logger.warn('No OPENAI_API_KEY or ANTHROPIC_API_KEY — generating a heuristic storyboard');
     }
 
     const steps = [];

@@ -1,21 +1,92 @@
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 
 /**
- * AI-powered decision maker for website interactions
+ * AI-powered decision maker for website interactions.
+ *
+ * Uses OpenAI when an OPENAI_API_KEY is configured, and transparently falls
+ * back to the Claude API (Anthropic) when OpenAI is unavailable or errors out
+ * (e.g. exhausted quota → 429). Set ANTHROPIC_API_KEY to enable the fallback;
+ * ANTHROPIC_MODEL overrides the default Claude model.
  */
 export class AIDecisionMaker {
   constructor(options = {}) {
     this.logger = options.logger;
     this.maxInteractions = options.maxInteractions ?? 10;
     this.model = options.model ?? process.env.OPENAI_MODEL ?? 'gpt-4-turbo-preview';
-    
+    this.anthropicModel = options.anthropicModel ?? process.env.ANTHROPIC_MODEL ?? 'claude-opus-4-8';
+
     // Initialize OpenAI client
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
 
+    // Anthropic client is created lazily so a missing key never throws at boot.
+    this._anthropicClient = null;
+
     // Supported interaction types
     this.supportedInteractions = ['click', 'type', 'hover', 'scroll', 'wait'];
+  }
+
+  /** Whether OpenAI is configured. */
+  hasOpenAI() {
+    return Boolean(process.env.OPENAI_API_KEY);
+  }
+
+  /** Whether the Claude fallback is configured. */
+  hasClaude() {
+    return Boolean(process.env.ANTHROPIC_API_KEY);
+  }
+
+  _anthropic() {
+    if (!this._anthropicClient) {
+      this._anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    }
+    return this._anthropicClient;
+  }
+
+  /**
+   * Run a single completion against OpenAI, falling back to Claude on failure.
+   * Returns the assistant text. `think` enables adaptive thinking on the Claude
+   * path (used for the more involved planning call, not for short narration).
+   * @returns {Promise<string>}
+   */
+  async _complete({ system, user, maxTokens, temperature = 0.3, think = false }) {
+    if (this.hasOpenAI()) {
+      try {
+        const response = await this.openai.chat.completions.create({
+          model: this.model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+          max_tokens: maxTokens,
+          temperature,
+        });
+        return response.choices[0].message.content.trim();
+      } catch (error) {
+        if (!this.hasClaude()) throw error;
+        this.logger?.warn(`OpenAI request failed (${error.message}); falling back to Claude`);
+      }
+    }
+
+    if (!this.hasClaude()) {
+      throw new Error('No LLM provider configured (set OPENAI_API_KEY or ANTHROPIC_API_KEY)');
+    }
+
+    // Claude path. Note: claude-opus-4-8 rejects temperature/top_p/top_k — omit them.
+    const params = {
+      model: this.anthropicModel,
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: 'user', content: user }],
+    };
+    if (think) {
+      params.thinking = { type: 'adaptive' };
+    }
+    const message = await this._anthropic().messages.create(params);
+    const textBlock = message.content.find((block) => block.type === 'text');
+    return (textBlock?.text ?? '').trim();
   }
 
   /**
@@ -74,25 +145,14 @@ export class AIDecisionMaker {
 
     try {
       const prompt = this.createNarrationPrompt(interaction);
-      
-      const response = await this.openai.chat.completions.create({
-        model: this.model,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a professional narrator creating voiceover for a web demo video. Generate natural, engaging narration that explains what is happening on screen.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        max_tokens: 150,
+
+      const narration = await this._complete({
+        system: 'You are a professional narrator creating voiceover for a web demo video. Generate natural, engaging narration that explains what is happening on screen. Respond with only the narration text — no preamble, quotes, or stage directions.',
+        user: prompt,
+        maxTokens: 150,
         temperature: 0.7,
       });
 
-      const narration = response.choices[0].message.content.trim();
-      
       this.logger?.debug('Narration generated', {
         length: narration.length,
       });
@@ -275,13 +335,9 @@ export class AIDecisionMaker {
    */
   async generateInteractionPlan(pageState, analysis) {
     const prompt = this.createInteractionPrompt(pageState, analysis);
-    
-    const response = await this.openai.chat.completions.create({
-      model: this.model,
-      messages: [
-        {
-          role: 'system',
-          content: `You are an AI that creates demo interactions for websites. Generate a JSON array of interactions that would showcase the website's features effectively. Each interaction should have: type, selector, description, reasoning, and duration (in milliseconds).
+
+    const content = await this._complete({
+      system: `You are an AI that creates demo interactions for websites. Generate a JSON array of interactions that would showcase the website's features effectively. Each interaction should have: type, selector, description, reasoning, and duration (in milliseconds).
 
 Supported interaction types: ${this.supportedInteractions.join(', ')}
 
@@ -292,19 +348,13 @@ IMPORTANT RULES:
 4. Look for navigation menus, feature buttons, data displays, settings, and core functionality
 5. Create a logical flow that demonstrates the app's value proposition
 
-Focus on the most important and demonstrative actions. Limit to ${this.maxInteractions} interactions maximum.`,
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      max_tokens: 2000,
+Respond with ONLY the JSON array — no markdown fences, no prose. Limit to ${this.maxInteractions} interactions maximum.`,
+      user: prompt,
+      maxTokens: 2000,
       temperature: 0.3,
+      think: true,
     });
 
-    const content = response.choices[0].message.content.trim();
-    
     try {
       return JSON.parse(content);
     } catch (parseError) {
