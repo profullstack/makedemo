@@ -74,7 +74,7 @@ export async function runScriptStage(job, emit) {
     let useAI = hasAI();
     if (useAI) {
       try {
-        logger.info(hasOpenAI() ? 'Planning interactions with OpenAI (Claude fallback ready)' : 'Planning interactions with Claude');
+        logger.info('Planning interactions with AI');
         interactions = await ai.planInteractions(page);
       } catch (err) {
         logger.warn(`AI planning failed (${err.message}) — falling back to a heuristic storyboard`);

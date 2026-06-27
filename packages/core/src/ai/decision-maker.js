@@ -51,30 +51,70 @@ export class AIDecisionMaker {
    * path (used for the more involved planning call, not for short narration).
    * @returns {Promise<string>}
    */
-  async _complete({ system, user, maxTokens, temperature = 0.3, think = false }) {
-    if (this.hasOpenAI()) {
-      try {
-        const response = await this.openai.chat.completions.create({
-          model: this.model,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-          max_tokens: maxTokens,
-          temperature,
-        });
-        return response.choices[0].message.content.trim();
-      } catch (error) {
-        if (!this.hasClaude()) throw error;
-        this.logger?.warn(`OpenAI request failed (${error.message}); falling back to Claude`);
-      }
-    }
-
-    if (!this.hasClaude()) {
+  async _complete(opts) {
+    const order = this._providerOrder();
+    if (!order.length) {
       throw new Error('No LLM provider configured (set OPENAI_API_KEY or ANTHROPIC_API_KEY)');
     }
 
-    // Claude path. Note: claude-opus-4-8 rejects temperature/top_p/top_k — omit them.
+    let lastError;
+    for (let i = 0; i < order.length; i++) {
+      const provider = order[i];
+      try {
+        return provider === 'claude'
+          ? await this._completeClaude(opts)
+          : await this._completeOpenAI(opts);
+      } catch (error) {
+        lastError = error;
+        const next = order[i + 1];
+        this.logger?.warn(
+          `${provider} request failed (${error.message})` +
+            (next ? `; falling back to ${next}` : '')
+        );
+      }
+    }
+    throw lastError;
+  }
+
+  /**
+   * Provider order, honouring LLM_PROVIDER (`claude`/`anthropic` to prefer
+   * Claude). Defaults to OpenAI-first, Claude as fallback. Only configured
+   * providers are included.
+   * @returns {string[]}
+   */
+  _providerOrder() {
+    const pref = (process.env.LLM_PROVIDER || '').toLowerCase();
+    const claudeFirst = pref === 'claude' || pref === 'anthropic';
+    const order = [];
+    const add = (p) => {
+      if (p === 'openai' && this.hasOpenAI() && !order.includes('openai')) order.push('openai');
+      if (p === 'claude' && this.hasClaude() && !order.includes('claude')) order.push('claude');
+    };
+    if (claudeFirst) {
+      add('claude');
+      add('openai');
+    } else {
+      add('openai');
+      add('claude');
+    }
+    return order;
+  }
+
+  async _completeOpenAI({ system, user, maxTokens, temperature = 0.3 }) {
+    const response = await this.openai.chat.completions.create({
+      model: this.model,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      max_tokens: maxTokens,
+      temperature,
+    });
+    return response.choices[0].message.content.trim();
+  }
+
+  async _completeClaude({ system, user, maxTokens, think = false }) {
+    // claude-opus-4-8 rejects temperature/top_p/top_k — omit them.
     const params = {
       model: this.anthropicModel,
       max_tokens: maxTokens,
