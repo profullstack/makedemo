@@ -28,7 +28,7 @@ function findFont() {
   return candidates[0]; // ffmpeg ignores a missing file only if fontfile omitted; see drawtextFont()
 }
 
-function escapeDrawtext(text) {
+export function escapeDrawtext(text) {
   return String(text || '')
     .replace(/\\/g, '\\\\')
     .replace(/:/g, '\\:')
