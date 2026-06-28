@@ -13,6 +13,7 @@
     "start": "node apps/web/server.js",
     "cli": "node src/index.js",
     "setup": "node scripts/setup.js",
+    "pipeline": "node scripts/run-pipeline.js",
     "test": "NODE_OPTIONS='--loader=./node_modules/mocha/lib/nodejs/esm-utils.js' mocha test/**/*.test.js --recursive",
     "test:pipeline": "NODE_OPTIONS='--loader=./node_modules/mocha/lib/nodejs/esm-utils.js' mocha test/pipeline/**/*.test.js --recursive",
     "test:watch": "NODE_OPTIONS='--loader=./node_modules/mocha/lib/nodejs/esm-utils.js' mocha test/**/*.test.js --recursive --watch",
