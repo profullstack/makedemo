@@ -13,3 +13,6 @@ export {
   VOICES,
 } from './src/audio/generator.js';
 export { createDemo } from './src/index.js';
+// Pipeline brain: crawl -> Claude feature detection -> per-feature recording ->
+// Claude VO script + Suno prompt -> ElevenLabs -> motion-graphics assembly.
+export { runPipeline, OUTPUT_ROOT as PIPELINE_OUTPUT_ROOT } from './src/pipeline/index.js';

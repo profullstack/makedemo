@@ -23,5 +23,9 @@ WORKDIR /app
 COPY . .
 RUN pnpm install
 
+# Playwright Chromium for the pipeline-brain recorder (MKDEMO_PIPELINE_BRAIN=1).
+# Harmless when the brain is disabled; required when it's on.
+RUN pnpm exec playwright install --with-deps chromium
+
 EXPOSE 3000
 CMD ["node", "apps/web/server.js"]

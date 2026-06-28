@@ -14,6 +14,7 @@
     "cli": "node src/index.js",
     "setup": "node scripts/setup.js",
     "test": "NODE_OPTIONS='--loader=./node_modules/mocha/lib/nodejs/esm-utils.js' mocha test/**/*.test.js --recursive",
+    "test:pipeline": "NODE_OPTIONS='--loader=./node_modules/mocha/lib/nodejs/esm-utils.js' mocha test/pipeline/**/*.test.js --recursive",
     "test:watch": "NODE_OPTIONS='--loader=./node_modules/mocha/lib/nodejs/esm-utils.js' mocha test/**/*.test.js --recursive --watch",
     "test:coverage": "NODE_OPTIONS='--loader=./node_modules/mocha/lib/nodejs/esm-utils.js' c8 mocha test/**/*.test.js --recursive",
     "lint": "eslint src/ test/",
