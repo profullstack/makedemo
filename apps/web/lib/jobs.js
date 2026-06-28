@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { runScriptStage, runAssetsStage, runRenderStage } from './pipeline.js';
+import { runPipeline as runBrainPipeline } from '@makedemo/core';
 
 const jobs = new Map();
 
@@ -16,6 +17,10 @@ export function createJob(input) {
     maxSteps: Math.min(Math.max(input.maxSteps ?? 6, 1), 12),
     voice: input.voice || null,
     credentials: input.credentials || null,
+    // Pipeline-brain inputs (used only when MKDEMO_PIPELINE_BRAIN=1):
+    maxFeatures: Math.min(Math.max(input.maxFeatures ?? 5, 1), 12),
+    clips: Array.isArray(input.clips) ? input.clips : [],
+    song: input.song || null,
     status: 'queued',
     stage: null,
     steps: [],
@@ -84,6 +89,14 @@ async function runPipeline(job) {
   const e = (type, data) => emit(job, type, data);
   job.status = 'running';
   e('status', { status: 'running' });
+
+  // Opt-in pipeline brain: crawl -> Claude features -> per-feature recording ->
+  // Claude VO script + Suno prompt -> ElevenLabs -> motion-graphics assembly.
+  // Default-off so the live scroll-tour pipeline is unchanged until flipped.
+  if (process.env.MKDEMO_PIPELINE_BRAIN === '1') {
+    await runBrainPipeline(job, e); // emits its own 'done'
+    return;
+  }
 
   await runScriptStage(job, e);
   await runAssetsStage(job, e);

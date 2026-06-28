@@ -6,6 +6,7 @@
   "main": "index.js",
   "exports": {
     ".": "./index.js",
+    "./pipeline": "./src/pipeline/index.js",
     "./browser": "./src/browser/manager.js",
     "./ai": "./src/ai/decision-maker.js",
     "./audio": "./src/audio/generator.js",
@@ -16,14 +17,20 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.69.0",
+    "@anthropic-ai/sdk": "^0.106.0",
     "dotenv": "^16.4.1",
     "elevenlabs": "^0.8.2",
     "fluent-ffmpeg": "^2.1.2",
     "fs-extra": "^11.2.0",
     "node-fetch": "^3.3.2",
     "openai": "^4.28.4",
+    "playwright": "^1.61.0",
     "puppeteer": "^21.11.0",
-    "winston": "^3.11.0"
+    "winston": "^3.11.0",
+    "zod": "^4.0.0"
+  },
+  "optionalDependencies": {
+    "@remotion/bundler": "^4.0.0",
+    "@remotion/renderer": "^4.0.0"
   }
 }
