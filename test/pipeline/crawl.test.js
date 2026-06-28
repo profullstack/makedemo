@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { globToRegExp, isExcluded, normalize } from '../../src/pipeline/url-utils.js';
+import { globToRegExp, isExcluded, normalize } from '../../packages/core/src/pipeline/url-utils.js';
 
 describe('crawl helpers', () => {
   it('converts a glob to an anchored regexp', () => {

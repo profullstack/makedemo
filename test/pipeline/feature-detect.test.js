@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { detectFeatures } from '../../src/pipeline/feature-detect.js';
+import { detectFeatures } from '../../packages/core/src/pipeline/feature-detect.js';
 
 // With no ANTHROPIC_API_KEY, parseStructured returns null and detectFeatures
 // falls back to its deterministic heuristic — which is what we exercise here.

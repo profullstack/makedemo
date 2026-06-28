@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { featureSchema, featureDetectionSchema, demoScriptSchema } from '../../src/pipeline/schemas.js';
+import { featureSchema, featureDetectionSchema, demoScriptSchema } from '../../packages/core/src/pipeline/schemas.js';
 
 describe('schemas', () => {
   it('accepts a well-formed feature', () => {

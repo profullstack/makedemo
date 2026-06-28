@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { buildMusicFilter } from '../../src/pipeline/music.js';
+import { buildMusicFilter } from '../../packages/core/src/pipeline/music.js';
 
 describe('music ducking filter', () => {
   it('splits the voiceover into a final track and a sidechain key', () => {

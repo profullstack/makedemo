@@ -1,0 +1,10 @@
+.git
+node_modules
+**/node_modules
+apps/web/output
+output
+.env
+.env.*
+!.env.example
+legacy
+*.log

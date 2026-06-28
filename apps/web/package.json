@@ -1,0 +1,21 @@
+{
+  "name": "@makedemo/web",
+  "version": "1.0.0",
+  "description": "makedemo web app — paste a URL, get a narrated demo video.",
+  "type": "module",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@makedemo/core": "workspace:*",
+    "dotenv": "^16.4.1",
+    "hono": "^4.6.14"
+  }
+}

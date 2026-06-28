@@ -8,7 +8,10 @@
     "mkdemo": "./src/cli/index.js"
   },
   "scripts": {
-    "start": "node src/index.js",
+    "web": "node apps/web/server.js",
+    "web:dev": "node --watch apps/web/server.js",
+    "start": "node apps/web/server.js",
+    "cli": "node src/index.js",
     "setup": "node scripts/setup.js",
     "pipeline": "node scripts/run-pipeline.js",
     "test": "NODE_OPTIONS='--loader=./node_modules/mocha/lib/nodejs/esm-utils.js' mocha test/**/*.test.js --recursive",
@@ -40,7 +43,8 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.106.0",
+    "@hono/node-server": "^1.13.7",
+    "hono": "^4.6.14",
     "chalk": "^5.3.0",
     "commander": "^11.1.0",
     "dotenv": "^16.4.1",
@@ -50,14 +54,8 @@
     "node-fetch": "^3.3.2",
     "openai": "^4.28.4",
     "ora": "^8.0.1",
-    "playwright": "^1.61.0",
     "puppeteer": "^21.11.0",
-    "winston": "^3.11.0",
-    "zod": "^4.0.0"
-  },
-  "optionalDependencies": {
-    "@remotion/bundler": "^4.0.0",
-    "@remotion/renderer": "^4.0.0"
+    "winston": "^3.11.0"
   },
   "devDependencies": {
     "@eslint/js": "^8.57.0",

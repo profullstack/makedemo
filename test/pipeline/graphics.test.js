@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { escapeDrawtext } from '../../src/pipeline/graphics.js';
+import { escapeDrawtext } from '../../packages/core/src/pipeline/graphics.js';
 
 describe('escapeDrawtext', () => {
   it('escapes colons (ffmpeg drawtext option separator)', () => {

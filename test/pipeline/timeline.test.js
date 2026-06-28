@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { buildTimeline, timelineDuration } from '../../src/pipeline/timeline.js';
+import { buildTimeline, timelineDuration } from '../../packages/core/src/pipeline/timeline.js';
 
 describe('timeline', () => {
   const segments = [

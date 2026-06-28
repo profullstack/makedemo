@@ -11,7 +11,11 @@ import { assembleVideo } from './assembly.js';
 import { isLlmEnabled } from './llm.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const OUTPUT_ROOT = path.resolve(__dirname, '../../output');
+// Honor OUTPUT_DIR (set by the web app) so brain output lands next to the web
+// shell's; otherwise default to the package-local output dir.
+export const OUTPUT_ROOT = process.env.OUTPUT_DIR
+  ? path.resolve(process.env.OUTPUT_DIR)
+  : path.resolve(__dirname, '../../../../output');
 
 /**
  * makedemo pipeline brain — drop-in for the web shell.

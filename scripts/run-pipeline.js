@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
-import { runPipeline } from '../src/pipeline/index.js';
+import { runPipeline } from '../packages/core/index.js';
 
 /**
  * Local CLI runner for the makedemo pipeline brain — useful for testing the

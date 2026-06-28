@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { writeScript } from '../../src/pipeline/script-writer.js';
+import { writeScript } from '../../packages/core/src/pipeline/script-writer.js';
 
 // No ANTHROPIC_API_KEY -> deterministic heuristic script.
 describe('writeScript (heuristic fallback)', () => {
